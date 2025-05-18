@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "cors": "^2.8.5",
+    "exceljs": "^4.4.0",
+    "express": "^5.1.0",
+    "mongoose": "^8.14.3",
+    "multer": "^1.4.5-lts.2"
+  },
+  "name": "excelsheet",
+  "version": "1.0.0",
+  "description": "",
+  "main": "excelGetPost.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dinker-123/excelSheet.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/dinker-123/excelSheet/issues"
+  },
+  "homepage": "https://github.com/dinker-123/excelSheet#readme"
+}

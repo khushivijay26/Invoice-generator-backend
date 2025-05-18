@@ -1,63 +1,145 @@
-const express = require('express');
-const multer = require('multer');
-const ExcelJS = require('exceljs');
-const fs = require('fs');
+// server.js
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
 
 const app = express();
-const upload = multer();
+const PORT = 3001;
 
-const PORT = 3000;
-const EXCEL_FILE = 'data.xlsx';
-
+// CORS config (so frontend can connect)
+const corsOptions = {
+  origin: "http://localhost:3000", // React app
+  methods: ["GET", "POST"],
+  allowedHeaders: ["Content-Type"],
+  credentials: true,
+};
+app.use(cors(corsOptions));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// POST API — Excel me form data add karo
-app.post('/submit', upload.none(), async function (req, res) {
-  const name = req.body.name;
-  const email = req.body.email;
-
-  const workbook = new ExcelJS.Workbook();
-
-  if (fs.existsSync(EXCEL_FILE)) {
-    await workbook.xlsx.readFile(EXCEL_FILE);
-  } else {
-    const sheet = workbook.addWorksheet('Sheet1');
-    sheet.addRow(['Name', 'Email']); // Header row
-  }
-
-  const sheet = workbook.getWorksheet('Sheet1');
-  sheet.addRow([name, email]);
-  await workbook.xlsx.writeFile(EXCEL_FILE);
-
-  res.send('Data Excel me save ho gaya.');
+// ----------------------
+// ✅ MONGODB CONNECTION
+// ----------------------
+mongoose.connect("mongodb://127.0.0.1:27017/invoiceDB", {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
+const db = mongoose.connection;
+db.on("error", console.error.bind(console, "MongoDB connection error:"));
+db.once("open", () => {
+  console.log("✅ MongoDB connected");
 });
 
-// GET API — Excel file se data padho aur bhejo
-app.get('/data', async function (req, res) {
-  const workbook = new ExcelJS.Workbook();
-
-  if (!fs.existsSync(EXCEL_FILE)) {
-    return res.status(404).send('Excel file nahi mila.');
-  }
-
-  await workbook.xlsx.readFile(EXCEL_FILE);
-  const sheet = workbook.getWorksheet('Sheet1');
-
-  const result = [];
-
-  sheet.eachRow(function (row, index) {
-    if (index === 1) return; // Header skip karo
-
-    const name = row.getCell(1).value;
-    const email = row.getCell(2).value;
-
-    result.push({ name: name, email: email });
-  });
-
-  res.json(result);
+// ----------------------
+// ✅ MONGOOSE MODELS
+// ----------------------
+const ItemSchema = new mongoose.Schema({
+  hsn_code: String,
+  quantity: String,
+  rate: String,
 });
 
-app.listen(PORT, function () {
-  console.log('Server chalu ho gaya at http://localhost:' + PORT);
+const InvoiceSchema = new mongoose.Schema({
+  company_name: String,
+  seller_address: String,
+  seller_phone_no: String,
+  seller_email: String,
+  seller_gst_no: String,
+  seller_state: String,
+  purchaser_name: String,
+  billing_address: String,
+  shipping_address: String,
+  purchaser_gst_no: String,
+  shipper_gst_no: String,
+  tax: String,
+  option: String,
+  items: [ItemSchema],
+  total: String,
+});
+
+const Invoice = mongoose.model("Invoice", InvoiceSchema);
+
+// ----------------------
+// ✅ POST API - Save Data to MongoDB
+// ----------------------
+app.post("/submit", async (req, res) => {
+  const {
+    company_name,
+    seller_address,
+    seller_phone_no,
+    seller_email,
+    seller_gst_no,
+    seller_state,
+    purchaser_name,
+    billing_address,
+    shipping_address,
+    purchaser_gst_no,
+    shipper_gst_no,
+    tax,
+    option,
+    items,
+    total,
+  } = req.body;
+
+  if (!Array.isArray(items)) {
+    return res.status(400).send("Items must be an array.");
+  }
+
+  try {
+    const invoice = new Invoice({
+      company_name,
+      seller_address,
+      seller_phone_no,
+      seller_email,
+      seller_gst_no,
+      seller_state,
+      purchaser_name,
+      billing_address,
+      shipping_address,
+      purchaser_gst_no,
+      shipper_gst_no,
+      tax,
+      option,
+      items,
+      total,
+    });
+    await invoice.save();
+    console.log("✅ Data saved to MongoDB");
+    res.send("Data saved to MongoDB");
+  } catch (error) {
+    console.error("MongoDB save error:", error);
+    res.status(500).send("MongoDB error");
+  }
+});
+
+// ----------------------
+// ✅ GET API - Fetch MongoDB Data
+// ----------------------
+app.get("/mongo-data", async (req, res) => {
+  try {
+    const invoices = await Invoice.find();
+    res.json(invoices);
+  } catch (error) {
+    console.error("Mongo GET error:", error);
+    res.status(500).send("MongoDB read error.");
+  }
+});
+
+// ✅ GET API - Invoice Number from MongoDB
+app.get("/invoice-number", async function (req, res) {
+  try {
+    const invoiceCount = await Invoice.countDocuments();
+    const nextInvoiceNumber = invoiceCount + 1;
+    res.json({ nextInvoiceNumber });
+  } catch (error) {
+    console.error("Error in GET /invoice-number:", error);
+    res.status(500).send("Error calculating invoice number.");
+  }
+});
+
+// ----------------------
+// ✅ Start Server
+// ----------------------
+app.listen(PORT, () => {
+  console.log(`🚀 Server running at http://localhost:${PORT}`);
 });
